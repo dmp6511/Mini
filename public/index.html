@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Creator & Leaderboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f4f4f4;
+        }
+
+        #teamForm,
+        #scoreForm {
+            margin-bottom: 20px;
+        }
+
+        input,
+        button {
+            padding: 8px;
+            margin: 5px;
+        }
+
+        .team,
+        .leaderboard {
+            background: white;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 0 5px #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Create Your Team</h1>
+    <form id="teamForm">
+        <div id="playerList"></div>
+        <button type="button" onclick="addPlayer()">Add Player</button>
+        <button type="submit">Create Team</button>
+    </form>
+    <div class="team" id="teamDisplay"></div>
+
+    <form id="scoreForm" style="display:none">
+        <input type="number" id="teamScore" placeholder="Enter Final Score" required>
+        <button type="submit">Submit Score</button>
+    </form>
+
+    <div class="leaderboard" id="leaderboardDisplay"></div>
+
+    <script>
+        let teamId = null;
+        let players = [];
+
+        function generateUserId() {
+            return Math.floor(100000 + Math.random() * 900000);
+        }
+
+        function addPlayer() {
+            if (players.length >= 4) return alert("Max 4 players allowed.");
+            const userId = generateUserId();
+            players.push(userId);
+            const list = document.getElementById('playerList');
+            const div = document.createElement('div');
+            div.textContent = `User ${userId}`;
+            list.appendChild(div);
+        }
+
+        async function loadLeaderboard() {
+            try {
+                const res = await fetch('/leaderboard/all');
+                const teams = await res.json();
+
+                const leaderboardHtml = teams.map((t, i) => `<li>${i + 1}. ${t.name} - ${t.score} pts</li>`).join('');
+                document.getElementById('leaderboardDisplay').innerHTML = `
+                    <h2>Leaderboard</h2>
+                    <ul>${leaderboardHtml}</ul>
+                `;
+            } catch (err) {
+                console.error('Error loading leaderboard:', err);
+            }
+        }
+
+        document.getElementById('teamForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            if (players.length === 0) return alert("Add at least one player.");
+
+            const res = await fetch('/create-team', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ playerNames: players.map(id => `User ${id}`) })
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                return alert("Team creation failed: " + errorText);
+            }
+
+            const team = await res.json();
+            teamId = team._id;
+            players = []; // Clear player list
+            document.getElementById('playerList').innerHTML = ''; // Clear UI display
+
+            document.getElementById('teamDisplay').innerHTML = `
+                <h3>Team: ${team.name}</h3>
+                <p>ID: ${teamId}</p>
+                <p>Players: ${team.players.join(', ')}</p>
+            `;
+
+            document.getElementById('scoreForm').style.display = 'block';
+            loadLeaderboard(); // Refresh leaderboard
+        });
+
+        document.getElementById('scoreForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const score = parseInt(document.getElementById('teamScore').value);
+
+            await fetch(`/submit-score/${teamId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ score })
+            });
+
+            const res = await fetch(`/leaderboard/${teamId}`);
+            const data = await res.json();
+
+            const topTeams = data.topTeams.map((t, i) => `<li>${i + 1}. ${t.name} - ${t.score} pts</li>`).join('');
+            const yourTeam = data.yourTeam;
+
+            document.getElementById('leaderboardDisplay').innerHTML = `
+                <h2>Leaderboard</h2>
+                <ul>${topTeams}</ul>
+                <p>Your Rank: #${data.yourRank} (${yourTeam.name} - ${yourTeam.score} pts)</p>
+            `;
+
+            // Clear team data on score submission
+            teamId = null;
+            document.getElementById('teamDisplay').innerHTML = '';
+            document.getElementById('scoreForm').style.display = 'none';
+        });
+
+        // Load full leaderboard on page load
+        window.onload = loadLeaderboard;
+    </script>
+</body>
+
+</html>
