@@ -1,83 +1,69 @@
-const express = require('express');
-const router = express.Router();
 const Team = require('./models/Team');
 const Player = require('./models/Player');
-const { generateUserId, generateTeamName } = require('../src/random');
+const teamNames = require('./teamNames.json');
 
-// get all teams
-router.get('/leaderboard/all', async (req, res) => {
-    const allTeams = await Team.find().sort({ score: -1 });
-    res.json(allTeams);
-});
+let currentTeam = {
+    name: '',
+    players: [],
+    timeout: null
+};
 
+// Function to get a random team name
+// pull a first name and a last name from the teamNames.json file
+function getRandomTeamName() {
+    const firstNames = teamNames.firstNames;
+    const lastNames = teamNames.lastNames;
 
+    const randomFirstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const randomLastName = lastNames[Math.floor(Math.random() * lastNames.length)];
 
-// Create a team with random user IDs
-router.post('/create-team', async (req, res) => {
-    try {
-        const { playerNames } = req.body;
+    return `${randomFirstName} ${randomLastName}`;
+};
 
-        if (!playerNames || !Array.isArray(playerNames)) {
-            return res.status(400).json({ error: "Missing or invalid playerNames array." });
+function startTeamTimeout() {
+    currentTeam.timeout = setTimeout(() => {
+        if (currentTeam.players.length > 0) {
+            submitCurrentTeam();
         }
+    }, 10000); // 10 seconds
+}
 
-        if (playerNames.length > 4) {
-            return res.status(400).json({ error: "Max 4 players allowed." });
-        }
-
-        const players = await Promise.all(
-            playerNames.map(async () => {
-                const player = new Player({ userId: generateUserId() });
-                return await player.save();
-            })
-        );
-
-        const team = new Team({ name: generateTeamName(), players });
-        await team.save();
-
-        const populatedTeam = await Team.findById(team._id).populate('players');
-
-        res.status(201).json({
-            _id: populatedTeam._id,
-            name: populatedTeam.name,
-            players: populatedTeam.players.map(p => `User ${p.userId}`)
-        });
-    } catch (err) {
-        console.error("Error in /create-team:", err);
-        res.status(500).json({ error: "Server error while creating team." });
+async function addPlayerToCurrentTeam(braceletId) {
+    if (currentTeam.players.length === 0) {
+        currentTeam.name = getRandomTeamName();
+        startTeamTimeout();
     }
-});
 
-// Submit a team's score
-router.post('/submit-score/:teamId', async (req, res) => {
-    try {
-        const { score } = req.body;
-        const team = await Team.findById(req.params.teamId);
-        if (!team) return res.status(404).json({ error: "Team not found." });
+    // Prevent duplicates
+    if (currentTeam.players.find(p => p.braceletId === braceletId)) return;
 
-        team.score = score;
-        await team.save();
-        res.json(team);
-    } catch (err) {
-        console.error("Error in /submit-score:", err);
-        res.status(500).json({ error: "Failed to update score." });
+    const newPlayer = new Player({ braceletId });
+    const savedPlayer = await newPlayer.save();
+
+    currentTeam.players.push(savedPlayer);
+
+    if (currentTeam.players.length === 4) {
+        await submitCurrentTeam();
     }
-});
+}
 
-// Get leaderboard and current team's rank
-router.get('/leaderboard/:teamId', async (req, res) => {
-    try {
-        const topTeams = await Team.find().sort({ score: -1 }).limit(4);
-        const allTeams = await Team.find().sort({ score: -1 });
+async function submitCurrentTeam() {
+    clearTimeout(currentTeam.timeout);
 
-        const yourRank = allTeams.findIndex(t => t.id === req.params.teamId) + 1;
-        const yourTeam = await Team.findById(req.params.teamId);
+    const team = new Team({
+        name: currentTeam.name,
+        players: currentTeam.players.map(p => p._id),
+        score: 0
+    });
 
-        res.json({ topTeams, yourRank, yourTeam });
-    } catch (err) {
-        console.error("Error in /leaderboard:", err);
-        res.status(500).json({ error: "Failed to fetch leaderboard." });
-    }
-});
+    await team.save();
 
-module.exports = router;
+    console.log(`✅ Team ${team.name} saved with ${currentTeam.players.length} players.`);
+
+    currentTeam = { name: '', players: [], timeout: null };
+}
+
+module.exports = {
+    addPlayerToCurrentTeam,
+    // (plus any existing exports you already have like leaderboard routes)
+};
