@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Team = require('./models/Team');
 const Player = require('./models/Player');
-const { getRandomTeamName } = require('./teamLogic');
+const { getRandomTeamName, addPlayerToCurrentTeam } = require('./teamLogic');
 
 // ✅ Create a new team from player names
 router.post('/create-team', async (req, res) => {

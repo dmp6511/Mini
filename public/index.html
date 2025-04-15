@@ -17,6 +17,12 @@
     </form>
     <div class="team" id="teamDisplay"></div>
 
+    <div>
+        <h2>Live Scans</h2>
+        <ul id="liveScans"></ul>
+    </div>
+
+
     <form id="scoreForm" style="display:none">
         <input type="number" id="teamScore" placeholder="Enter Final Score" required>
         <button type="submit">Submit Score</button>
@@ -112,6 +118,15 @@
             document.getElementById('teamDisplay').innerHTML = '';
             document.getElementById('scoreForm').style.display = 'none';
         });
+
+        const socket = new WebSocket(`ws://${location.host}`);
+
+        socket.onmessage = (event) => {
+            const { braceletId } = JSON.parse(event.data);
+            const li = document.createElement('li');
+            li.textContent = `Scanned: ${braceletId}`;
+            document.getElementById('liveScans').prepend(li);
+        };
 
         // Load full leaderboard on page load
         window.onload = loadLeaderboard;

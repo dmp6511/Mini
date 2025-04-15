@@ -1,19 +1,27 @@
-const { addPlayerToCurrentTeam } = require('./team');
+const { getLatestScan } = require('./rfidScraper');
+const { addPlayerToCurrentTeam } = require('./teamLogic');
 
-const handleRFIDScan = async (req, res) => {
-    const { braceletId } = req.body;
+let lastScan = null;
 
-    if (!braceletId) {
-        return res.status(400).send('Missing braceletId');
-    }
+async function pollRFIDScanner() {
+    const scanned = await getLatestScan();
+    if (!scanned || scanned === lastScan) return;
 
-    try {
-        await addPlayerToCurrentTeam(braceletId);
-        res.status(200).send('Player added to team');
-    } catch (err) {
-        console.error('RFID scan error:', err);
-        res.status(500).send('Server error');
-    }
-};
+    lastScan = scanned;
+    console.log(`📶 New scan: ${scanned}`);
+    await addPlayerToCurrentTeam(scanned);
+}
 
-module.exports = { handleRFIDScan };
+function startPolling(onNewScan) {
+    setInterval(async () => {
+        const scanned = await getLatestScan();
+        if (!scanned || scanned === lastScan) return;
+
+        lastScan = scanned;
+        console.log(`📶 New scan: ${scanned}`);
+        await addPlayerToCurrentTeam(scanned);
+        onNewScan(scanned);
+    }, 5000); // every 5 seconds
+}
+
+module.exports = { startPolling };
