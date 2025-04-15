@@ -1,69 +1,84 @@
+const express = require('express');
+const router = express.Router();
 const Team = require('./models/Team');
 const Player = require('./models/Player');
-const teamNames = require('./teamNames.json');
+const { getRandomTeamName } = require('./teamLogic');
 
-let currentTeam = {
-    name: '',
-    players: [],
-    timeout: null
-};
+// ✅ Create a new team from player names
+router.post('/create-team', async (req, res) => {
+    let { playerNames, teamName } = req.body;
 
-// Function to get a random team name
-// pull a first name and a last name from the teamNames.json file
-function getRandomTeamName() {
-    const firstNames = teamNames.firstNames;
-    const lastNames = teamNames.lastNames;
-
-    const randomFirstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const randomLastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-
-    return `${randomFirstName} ${randomLastName}`;
-};
-
-function startTeamTimeout() {
-    currentTeam.timeout = setTimeout(() => {
-        if (currentTeam.players.length > 0) {
-            submitCurrentTeam();
-        }
-    }, 10000); // 10 seconds
-}
-
-async function addPlayerToCurrentTeam(braceletId) {
-    if (currentTeam.players.length === 0) {
-        currentTeam.name = getRandomTeamName();
-        startTeamTimeout();
+    if (!playerNames || !Array.isArray(playerNames) || playerNames.length === 0) {
+        return res.status(400).json({ error: 'No player names provided' });
     }
 
-    // Prevent duplicates
-    if (currentTeam.players.find(p => p.braceletId === braceletId)) return;
+    try {
+        const savedPlayers = await Promise.all(
+            playerNames.map(name => new Player({ braceletId: name }).save())
+        );
 
-    const newPlayer = new Player({ braceletId });
-    const savedPlayer = await newPlayer.save();
+        // generate a team name
+        teamName = getRandomTeamName();
 
-    currentTeam.players.push(savedPlayer);
+        // create a new team with the saved players
+        const team = new Team({
+            name: teamName || 'Unnamed Team',
+            players: savedPlayers.map(p => p._id),
+            score: 0
+        });
 
-    if (currentTeam.players.length === 4) {
-        await submitCurrentTeam();
+        await team.save();
+
+        res.status(201).json({ message: 'Team created', team });
+    } catch (err) {
+        console.error('❌ Error creating team:', err);
+        res.status(500).json({ error: 'Server error' });
     }
-}
+});
 
-async function submitCurrentTeam() {
-    clearTimeout(currentTeam.timeout);
+// ✅ Submit a final score for a team
+router.post('/submit-score/:teamId', async (req, res) => {
+    const { teamId } = req.params;
+    const { score } = req.body;
 
-    const team = new Team({
-        name: currentTeam.name,
-        players: currentTeam.players.map(p => p._id),
-        score: 0
-    });
+    try {
+        const team = await Team.findById(teamId);
+        if (!team) return res.status(404).json({ error: 'Team not found' });
 
-    await team.save();
+        team.score = score;
+        await team.save();
 
-    console.log(`✅ Team ${team.name} saved with ${currentTeam.players.length} players.`);
+        res.status(200).json({ message: 'Score updated', team });
+    } catch (err) {
+        console.error('❌ Error updating score:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 
-    currentTeam = { name: '', players: [], timeout: null };
-}
+// ✅ Get full leaderboard
+router.get('/leaderboard/all', async (req, res) => {
+    try {
+        const teams = await Team.find().sort({ score: -1 }).populate('players');
+        res.json(teams);
+    } catch (err) {
+        console.error('❌ Error fetching leaderboard:', err);
+        res.status(500).json({ error: 'Could not fetch leaderboard' });
+    }
+});
 
-module.exports = {
-    addPlayerToCurrentTeam,
-    // (plus any existing exports you already have like leaderboard routes)
-};
+// ✅ Get individual team details
+router.get('/leaderboard/:teamId', async (req, res) => {
+    const { teamId } = req.params;
+
+    try {
+        const team = await Team.findById(teamId).populate('players');
+        if (!team) return res.status(404).json({ error: 'Team not found' });
+
+        res.json(team);
+    } catch (err) {
+        console.error('❌ Error fetching team:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+module.exports = router;
