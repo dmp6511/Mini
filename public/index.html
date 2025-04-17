@@ -40,11 +40,9 @@
 
         function addPlayer() {
             if (players.length >= 4) return alert("Max 4 players allowed.");
-            const userId = generateUserId();
-            players.push(userId);
             const list = document.getElementById('playerList');
             const div = document.createElement('div');
-            div.textContent = `User ${userId}`;
+            div.textContent = `User`;
             list.appendChild(div);
         }
 
@@ -121,13 +119,50 @@
 
         // eventSource for live updates
         const evtSource = new EventSource('http://nm-rfid-1.rit.edu:8001/sse');
-        evtSource.onmessage = function (event) {
+        evtSource.onmessage = async function (event) {
             const data = event.data;
             console.log('Live scan data:', data);
+
+            // add player to player list and team
+            await fetch('/add-player', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ playerId: data })
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                // add player to team array
+                players.push(data);
+                return response.json();
+            }).then(data => {
+                console.log('Player added:');
+                // Update the UI or perform any other actions with the response data
+                const playerList = document.getElementById('playerList');
+                const playerDiv = document.createElement('div');
+                playerDiv.textContent = `User ${event.data} added to team`;
+                playerList.appendChild(playerDiv);
+            }).catch(error => {
+                console.error('Error adding player:', error);
+            });
+
+
+            console.log("players", players);
+
+
+            // fetch to http://new-media-metagame.com/player/{data}
+            // get {
+            //   player_id: <some id>
+            // }
+            // const playerId = <player_id>
+
             const liveScansList = document.getElementById('liveScans');
             const li = document.createElement('li');
-            li.textContent = `User ${data.userId} scanned at ${new Date(data.timestamp).toLocaleTimeString()}`;
+            li.textContent = `User ${data} scanned in`;
             liveScansList.appendChild(li);
+
+
         };
 
         // Load full leaderboard on page load

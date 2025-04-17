@@ -4,6 +4,21 @@ const Team = require('./models/Team');
 const Player = require('./models/Player');
 const { getRandomTeamName, addPlayerToCurrentTeam } = require('./teamLogic');
 
+
+router.post('/add-player', async (req, res) => {
+    const userID = req.body;
+    console.log('Received userID:', userID);
+
+    // assign the player to a team
+    try {
+        addPlayerToCurrentTeam(userID.toString());
+        res.status(200).json({ message: 'Player added to team' });
+    } catch (err) {
+        console.error('❌ Error adding player:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // ✅ Create a new team from player names
 router.post('/create-team', async (req, res) => {
     let { playerNames, teamName } = req.body;

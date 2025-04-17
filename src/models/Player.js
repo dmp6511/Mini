@@ -1,7 +1,7 @@
 // models/Player.js
 const mongoose = require('mongoose');
 const PlayerSchema = new mongoose.Schema({
-    userId: Number,
+    userId: String,
     score: {
         type: Number,
         default: 0,

@@ -24,7 +24,7 @@ function startTeamTimeout() {
         if (currentTeam.players.length > 0) {
             submitCurrentTeam();
         }
-    }, 10000);
+    }, 100000); // 100 seconds
 }
 
 async function addPlayerToCurrentTeam(braceletId) {
@@ -34,8 +34,7 @@ async function addPlayerToCurrentTeam(braceletId) {
     }
 
     if (currentTeam.players.find(p => p.braceletId === braceletId)) return;
-
-    const newPlayer = new Player({ braceletId });
+    const newPlayer = new Player({ userId: braceletId });
     const savedPlayer = await newPlayer.save();
     currentTeam.players.push(savedPlayer);
 
