@@ -35,10 +35,6 @@ wss.broadcast = function (data) {
     });
 };
 
-// Start polling with access to broadcast
-startPolling((braceletId) => {
-    wss.broadcast({ braceletId });
-});
 
 server.listen(PORT, () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);

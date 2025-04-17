@@ -119,13 +119,15 @@
             document.getElementById('scoreForm').style.display = 'none';
         });
 
-        const socket = new WebSocket(`ws://${location.host}`);
-
-        socket.onmessage = (event) => {
-            const { braceletId } = JSON.parse(event.data);
+        // eventSource for live updates
+        const evtSource = new EventSource('http://nm-rfid-1.rit.edu:8001/sse');
+        evtSource.onmessage = function (event) {
+            const data = event.data;
+            console.log('Live scan data:', data);
+            const liveScansList = document.getElementById('liveScans');
             const li = document.createElement('li');
-            li.textContent = `Scanned: ${braceletId}`;
-            document.getElementById('liveScans').prepend(li);
+            li.textContent = `User ${data.userId} scanned at ${new Date(data.timestamp).toLocaleTimeString()}`;
+            liveScansList.appendChild(li);
         };
 
         // Load full leaderboard on page load
