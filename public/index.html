@@ -289,31 +289,58 @@
 
 
         // RFID SCANNER CODE
-        const lightPresets= {
-            'success': {
+        const lightPresets = {
+            success: {
                 pattern: 'pulse',
                 duration: '1',
                 foreground: '#00ff00',
                 background: '#000000',
                 period: '1.5'
             },
-            'error': {
+            error: {
                 pattern: 'pulse',
                 duration: '1',
                 foreground: '#ff0000',
                 background: '#000000',
                 period: '1.5'
             },
-            'default': {
-                pattern: 'double comet',
-                duration: '1',
-                foreground: 'ef4d25',
-                background: 'f6f967',
-                foreground2:'32cd32',
-                background2: '6532f1',
+            default: {
+                pattern: 'doublecomet',
+                duration: '25',
+                foreground: '#ef4d25',
+                background: '#f6f967',
+                foreground2: '#32cd32',
+                background2: '#6532f1',
                 period: '1.5'
             }
+        };
+
+
+        // set lights function
+        function setLights(presetName) {
+            const preset = lightPresets[presetName];
+            if (!preset) return console.warn(`⚠️ Unknown light preset: ${presetName}`);
+
+            const body = new URLSearchParams(preset);
+
+            fetch('http://nm-rfid-1.rit.edu:8001/lights', {
+                method: 'POST',
+                body
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log(`💡 Lights set to ${presetName}`);
+                    } else {
+                        console.warn(`⚠️ Lights response:`, data);
+                    }
+                })
+                .catch(err => {
+                    console.error(`❌ Error setting lights (${presetName}):`, err);
+                });
         }
+
+
 
         // Listening for live scans
         const evtSource = new EventSource('http://nm-rfid-1.rit.edu:8001/sse');
@@ -322,27 +349,13 @@
             console.log('Live scan data:', data);
 
             // change lights to green
-            try {
-                const body = new URLSearchParams({
-                    pattern: 'pulse',
-                    duration: '1',
-                    foreground: '#00ff00',
-                    background: '#000000',
-                    period: '1.5'
-                });
+            setLights('success');
 
-                const res = await fetch('http://nm-rfid-1.rit.edu:8001/lights', {
-                    method: 'POST',
-                    body
-                });
-
-                if (!res.ok) throw new Error(`Error: ${res.status}`);
-                const result = await res.json();
-                console.log('✅ Light response:', result);
-
-            } catch (err) {
-                console.error('❌ Failed to set lights:', err);
-            }
+            // back to default after 2 seconds
+            setTimeout(() => {
+                setLights('default');
+            }, 500);
+          
 
 
             await fetch('/add-player', {
@@ -373,6 +386,7 @@
         window.onload = () => {
             loadLeaderboard();
             loadNameOptions();
+            setLights('default');
         };
     </script>
 </body>
