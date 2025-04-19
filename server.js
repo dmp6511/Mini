@@ -18,6 +18,9 @@ mongoose.connect('mongodb://127.0.0.1:27017/leaderboard')
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname)));
+app.use(express.urlencoded({ extended: true }));
+
 
 // Routes
 const teamRoutes = require('./src/team');

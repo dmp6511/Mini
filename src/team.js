@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Team = require('./models/Team');
 const Player = require('./models/Player');
-const { getRandomTeamName, addPlayerToCurrentTeam } = require('./teamLogic');
+const { getRandomTeamName, addPlayerToCurrentTeam, getTeamNames } = require('./teamLogic');
 
 
 router.post('/add-player', async (req, res) => {
@@ -32,9 +32,6 @@ router.post('/create-team', async (req, res) => {
             playerNames.map(name => new Player({ braceletId: name }).save())
         );
 
-        // generate a team name
-        teamName = getRandomTeamName();
-
         // create a new team with the saved players
         const team = new Team({
             name: teamName || 'Unnamed Team',
@@ -50,6 +47,37 @@ router.post('/create-team', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+// get a list of names for teams to select from
+router.get('/team-names', (req, res) => {
+    const firstNames = getTeamNames().map(team => team.firstName);
+    const secondNames = getTeamNames().map(team => team.secondName);
+    res.json({ firstNames, secondNames });
+});
+
+// update team name
+router.patch('/update-team-name/:id', async (req, res) => {
+    const { id } = req.params;
+    const { newName } = req.body;
+
+    try {
+        const updatedTeam = await Team.findByIdAndUpdate(
+            id,
+            { name: newName },
+            { new: true }
+        );
+
+        if (!updatedTeam) {
+            return res.status(404).json({ error: 'Team not found' });
+        }
+
+        res.json(updatedTeam);
+    } catch (err) {
+        console.error('Error updating team name:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 
 // ✅ Submit a final score for a team
 router.post('/submit-score/:teamId', async (req, res) => {

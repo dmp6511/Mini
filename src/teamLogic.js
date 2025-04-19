@@ -19,6 +19,19 @@ function getRandomTeamName() {
     return `${randomFirstName} ${randomSecondName}`;
 }
 
+// team selection logic
+// the team is created when the first player joins
+// names are chosen randomly from the teamNames.json file and the users can cycle through a few of them to get a name they like
+// the team is submitted when 4 players have joined or after 100 seconds of inactivity
+function getTeamNames() {
+    return teamNames.teamNames.firstName.map((firstName, index) => {
+        return {
+            firstName: firstName,
+            secondName: teamNames.teamNames.secondName[index]
+        };
+    });
+}
+
 function startTeamTimeout() {
     currentTeam.timeout = setTimeout(() => {
         if (currentTeam.players.length > 0) {
@@ -56,4 +69,4 @@ async function submitCurrentTeam() {
     currentTeam = { name: '', players: [], timeout: null };
 }
 
-module.exports = { addPlayerToCurrentTeam, getRandomTeamName };
+module.exports = { addPlayerToCurrentTeam, getRandomTeamName, getTeamNames, submitCurrentTeam };

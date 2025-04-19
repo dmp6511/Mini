@@ -2,10 +2,75 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Team Creator & Leaderboard</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+        }
+
+        .card {
+            background-color: #f8f8ff;
+            border: 2px solid #dcdcdc;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 30px auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .name-controls {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .name-column h3 {
+            margin-bottom: 8px;
+        }
+
+        .name-column button,
+        #refreshNames,
+        #submitTeamName,
+        button[type="submit"],
+        button[type="button"] {
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #e0e0f0;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.2s ease;
+            margin: 5px;
+        }
+
+        .name-column button:hover,
+        #refreshNames:hover,
+        #submitTeamName:hover {
+            background-color: #c6c6e6;
+        }
+
+        #displayTeamName {
+            font-size: 1.8em;
+            color: #333;
+            margin: 10px 0;
+        }
+
+        #lockedName {
+            margin-top: 15px;
+            font-weight: bold;
+            color: green;
+        }
+
+        .leaderboard ul {
+            list-style: none;
+            padding: 0;
+        }
+    </style>
 </head>
 
 <body>
@@ -15,28 +80,54 @@
         <button type="button" onclick="addPlayer()">Add Player</button>
         <button type="submit">Create Team</button>
     </form>
+
     <div class="team" id="teamDisplay"></div>
 
-    <div>
+    <div class="card" id="nameSelect">
+        <h2>Team Name Generator</h2>
+
+        <div class="name-controls">
+            <div class="name-column">
+                <h3>Word 1</h3>
+                <button type="button" id="firstNameButton">⏭️ Next</button>
+            </div>
+
+            <div class="name-column">
+                <h3>Word 2</h3>
+                <button type="button" id="secondNameButton">⏭️ Next</button>
+            </div>
+        </div>
+
+        <div id="namePicker">
+            <p id="combinedName">Your Team Name:</p>
+            <h1 id="displayTeamName">Loading...</h1>
+            <button id="refreshNames" type="button">🔄 Refresh Name Pool</button>
+            <button id="submitTeamName" type="button">✅ Set Team Name</button>
+            <p id="lockedName"></p>
+        </div>
+    </div>
+
+    <div class="card">
         <h2>Live Scans</h2>
         <ul id="liveScans"></ul>
     </div>
 
-
     <form id="scoreForm" style="display:none">
-        <input type="number" id="teamScore" placeholder="Enter Final Score" required>
+        <input type="number" id="teamScore" placeholder="Enter Final Score" required />
         <button type="submit">Submit Score</button>
     </form>
 
-    <div class="leaderboard" id="leaderboardDisplay"></div>
+    <div class="leaderboard card" id="leaderboardDisplay"></div>
 
     <script>
         let teamId = null;
         let players = [];
+        let lockedTeamName = '';
 
-        function generateUserId() {
-            return Math.floor(100000 + Math.random() * 900000);
-        }
+        let firstNames = [];
+        let secondNames = [];
+        let currentFirstIndex = 0;
+        let currentSecondIndex = 0;
 
         function addPlayer() {
             if (players.length >= 4) return alert("Max 4 players allowed.");
@@ -61,14 +152,89 @@
             }
         }
 
+        async function loadNameOptions() {
+            try {
+                const res = await fetch('/teamNames.json');
+                const nameData = await res.json();
+                const nameRoot = nameData.teamNames || {};
+
+                firstNames = nameRoot.firstName || [];
+                secondNames = nameRoot.secondName || [];
+
+                currentFirstIndex = 0;
+                currentSecondIndex = 0;
+                updateTeamNameDisplay();
+            } catch (err) {
+                console.error("Error loading name options:", err);
+            }
+        }
+
+        function updateTeamNameDisplay() {
+            const name = `${firstNames[currentFirstIndex]} ${secondNames[currentSecondIndex]}`;
+            document.getElementById('displayTeamName').textContent = name;
+        }
+
+        document.getElementById('firstNameButton').addEventListener('click', () => {
+            currentFirstIndex = (currentFirstIndex + 1) % firstNames.length;
+            updateTeamNameDisplay();
+        });
+
+        document.getElementById('secondNameButton').addEventListener('click', () => {
+            currentSecondIndex = (currentSecondIndex + 1) % secondNames.length;
+            updateTeamNameDisplay();
+        });
+
+        document.getElementById('refreshNames').addEventListener('click', () => {
+            loadNameOptions();
+        });
+
+        document.getElementById('submitTeamName').addEventListener('click', async () => {
+            if (!teamId) {
+                alert("You need to create a team first.");
+                return;
+            }
+
+            const newTeamName = `${firstNames[currentFirstIndex]} ${secondNames[currentSecondIndex]}`;
+
+            try {
+                const res = await fetch(`/update-team-name/${teamId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ newName: newTeamName })
+                });
+
+                if (!res.ok) {
+                    throw new Error('Failed to update team name.');
+                }
+
+                const updated = await res.json();
+                lockedTeamName = updated.name;
+
+                document.getElementById('lockedName').textContent = `✅ Team name updated: ${lockedTeamName}`;
+                document.getElementById('teamDisplay').innerHTML = `
+                    <h3>Team: ${updated.name}</h3>
+                    <p>ID: ${updated._id}</p>
+                    <p>Players: ${updated.players.length}</p>
+                `;
+            } catch (err) {
+                console.error(err);
+                alert("Error updating team name.");
+            }
+        });
+
         document.getElementById('teamForm').addEventListener('submit', async function (e) {
             e.preventDefault();
             if (players.length === 0) return alert("Add at least one player.");
 
+            const defaultTeamName = `${firstNames[currentFirstIndex]} ${secondNames[currentSecondIndex]}` || "Unnamed Team";
+
             const res = await fetch('/create-team', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ playerNames: players.map(id => `User ${id}`) })
+                body: JSON.stringify({
+                    playerNames: players.map(id => `User ${id}`),
+                    teamName: defaultTeamName
+                })
             });
 
             if (!res.ok) {
@@ -79,17 +245,17 @@
             const result = await res.json();
             const team = result.team;
             teamId = team._id;
-            players = []; // Clear player list
-            document.getElementById('playerList').innerHTML = ''; // Clear UI display
+            players = [];
+            document.getElementById('playerList').innerHTML = '';
 
             document.getElementById('teamDisplay').innerHTML = `
                 <h3>Team: ${team.name}</h3>
-                <p>ID: ${teamId}</p>
+                <p>ID: ${team._id}</p>
                 <p>Players: ${team.players.length}</p>
             `;
 
             document.getElementById('scoreForm').style.display = 'block';
-            loadLeaderboard(); // Refresh leaderboard
+            loadLeaderboard();
         });
 
         document.getElementById('scoreForm').addEventListener('submit', async function (e) {
@@ -111,34 +277,25 @@
                 <p>${yourTeam.name} - ${yourTeam.score} pts</p>
             `;
 
-            // Clear team data on score submission
             teamId = null;
             document.getElementById('teamDisplay').innerHTML = '';
             document.getElementById('scoreForm').style.display = 'none';
         });
 
-        // eventSource for live updates
         const evtSource = new EventSource('http://nm-rfid-1.rit.edu:8001/sse');
         evtSource.onmessage = async function (event) {
             const data = event.data;
             console.log('Live scan data:', data);
 
-            // add player to player list and team
             await fetch('/add-player', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ playerId: data })
             }).then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-
-                // add player to team array
+                if (!response.ok) throw new Error('Network response was not ok');
                 players.push(data);
                 return response.json();
             }).then(data => {
-                console.log('Player added:');
-                // Update the UI or perform any other actions with the response data
                 const playerList = document.getElementById('playerList');
                 const playerDiv = document.createElement('div');
                 playerDiv.textContent = `User ${event.data} added to team`;
@@ -147,27 +304,16 @@
                 console.error('Error adding player:', error);
             });
 
-
-            console.log("players", players);
-
-
-            // fetch to http://new-media-metagame.com/player/{data}
-            // get {
-            //   player_id: <some id>
-            // }
-            // const playerId = <player_id>
-
             const liveScansList = document.getElementById('liveScans');
             const li = document.createElement('li');
             li.textContent = `User ${data} scanned in`;
             liveScansList.appendChild(li);
-
-
         };
 
-        // Load full leaderboard on page load
-        window.onload = loadLeaderboard;
+        window.onload = () => {
+            loadLeaderboard();
+            loadNameOptions();
+        };
     </script>
 </body>
-
 </html>
