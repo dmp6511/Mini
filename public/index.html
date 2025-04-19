@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Team Creator & Leaderboard</title>
     <link rel="stylesheet" href="styles.css" />
     <style>
@@ -18,7 +18,7 @@
             border-radius: 12px;
             padding: 20px;
             margin: 30px auto;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
             max-width: 600px;
             text-align: center;
         }
@@ -142,15 +142,20 @@
                 const res = await fetch('/leaderboard/all');
                 const teams = await res.json();
 
-                const leaderboardHtml = teams.map((t, i) => `<li>${i + 1}. ${t.name} - ${t.score} pts</li>`).join('');
+                const leaderboardHtml = teams.map((t, i) => {
+                    const crowned = i === 0 ? 'crowned' : '';
+                    return `<li class="${crowned}">${i + 1}. ${t.name} - ${t.score} pts</li>`;
+                }).join('');
+
                 document.getElementById('leaderboardDisplay').innerHTML = `
-                    <h2>Leaderboard</h2>
-                    <ul>${leaderboardHtml}</ul>
-                `;
+            <h2>Leaderboard</h2>
+            <ul>${leaderboardHtml}</ul>
+        `;
             } catch (err) {
                 console.error('Error loading leaderboard:', err);
             }
         }
+
 
         async function loadNameOptions() {
             try {
@@ -282,10 +287,63 @@
             document.getElementById('scoreForm').style.display = 'none';
         });
 
+
+        // RFID SCANNER CODE
+        const lightPresets= {
+            'success': {
+                pattern: 'pulse',
+                duration: '1',
+                foreground: '#00ff00',
+                background: '#000000',
+                period: '1.5'
+            },
+            'error': {
+                pattern: 'pulse',
+                duration: '1',
+                foreground: '#ff0000',
+                background: '#000000',
+                period: '1.5'
+            },
+            'default': {
+                pattern: 'double comet',
+                duration: '1',
+                foreground: 'ef4d25',
+                background: 'f6f967',
+                foreground2:'32cd32',
+                background2: '6532f1',
+                period: '1.5'
+            }
+        }
+
+        // Listening for live scans
         const evtSource = new EventSource('http://nm-rfid-1.rit.edu:8001/sse');
         evtSource.onmessage = async function (event) {
             const data = event.data;
             console.log('Live scan data:', data);
+
+            // change lights to green
+            try {
+                const body = new URLSearchParams({
+                    pattern: 'pulse',
+                    duration: '1',
+                    foreground: '#00ff00',
+                    background: '#000000',
+                    period: '1.5'
+                });
+
+                const res = await fetch('http://nm-rfid-1.rit.edu:8001/lights', {
+                    method: 'POST',
+                    body
+                });
+
+                if (!res.ok) throw new Error(`Error: ${res.status}`);
+                const result = await res.json();
+                console.log('✅ Light response:', result);
+
+            } catch (err) {
+                console.error('❌ Failed to set lights:', err);
+            }
+
 
             await fetch('/add-player', {
                 method: 'POST',
@@ -310,10 +368,13 @@
             liveScansList.appendChild(li);
         };
 
+
+
         window.onload = () => {
             loadLeaderboard();
             loadNameOptions();
         };
     </script>
 </body>
+
 </html>

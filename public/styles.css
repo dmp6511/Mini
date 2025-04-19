@@ -119,3 +119,22 @@ ul li {
 #refreshNames:hover {
   background-color: #bce8f1;
 }
+
+
+@keyframes crownFlash {
+  0%, 100% { background-color: gold; color: #2c3e50; transform: scale(1); }
+  50% { background-color: #ffe600; transform: scale(1.1); }
+}
+
+.crowned {
+  animation: crownFlash 1s ease-in-out 3;
+  font-size: 1.3em;
+  position: relative;
+}
+
+.crowned::before {
+  content: \"👑\";
+  position: absolute;
+  left: -30px;
+  font-size: 1.5em;
+}
